@@ -251,6 +251,19 @@ let rec equal_list (a : 'a list) (b : 'a list) (equal : 'a -> 'a -> bool) : bool
   - : bool = true
 *)
 
+let rec get_head_tail (ls : 'a list list) : ('a list * 'a list list) = match ls with
+                                                                       | [] -> ([], [])
+                                                                       | x :: xs -> 
+                                                                        let (return_list, return_list_list) = get_head_tail xs in
+                                                                              (match x with
+                                                                              | [] -> (return_list, return_list_list) 
+                                                                              | hd :: tl -> (hd :: return_list, tl :: return_list_list));;
+
+let rec transpose (ls: 'a list list) : 'a list list = let (first_col, others) = get_head_tail ls in 
+                                                           match first_col with
+                                                           | [] -> []
+                                                           | _ -> first_col :: (transpose others);;
+
 let rec equal_grid (a : 'a list list) (b : 'a list list) : bool = match a with 
                                                                   | [] -> (match b with 
                                                                            | [] -> true
@@ -270,6 +283,28 @@ let rec zero_counter (ls : int list) : int list = match ls with
                                                                                                | _ -> failwith "invalid") 
                                                                               else (1 :: xs_zeros));;
 
+let verify_solution (grid : int list list) (col_clues : int list list) (row_clues : int list list) : bool =  
+                                  (is_rectangular grid) &&
+                                  let rec build_row (grid : int list list) : int list list = (match grid with 
+                                                            | [] -> []
+                                                            | x :: xs -> (zero_counter x) :: (build_row xs)) in
+                                  (
+                                      let row_grid = build_row grid in
+                                            equal_grid row_grid row_clues
+                                  ) 
+                                  &&
+                                  (
+                                  let t_grid = transpose grid in
+                                     let row_tgrid = build_row t_grid in
+                                        equal_grid row_tgrid col_clues
+                                  );;
+
+
+(* let rec list_map (ls : 'a list) (f: 'a  -> 'b) : 'b list = match ls with
+                                                          | [] -> []
+                                                          | x :: xs -> (f x) :: (list_map xs f);;
+
+
 let rec get_nth_grid (ls : 'a list list) ( n : int ): 'a list = let rec get_nth (ls : 'a list) ( n : int ): 'a = match ls with
                                                                        | [] -> failwith "invalid list"
                                                                        | x :: xs -> if n = 0 then x else (get_nth xs (n-1)) in
@@ -279,7 +314,7 @@ let rec get_nth_grid (ls : 'a list list) ( n : int ): 'a list = let rec get_nth 
     
                                                                                             
 
-let verify_solution (grid : int list list) (col_clues : int list list) (row_clues : int list list) : bool =  
+let verify_solution_v1 (grid : int list list) (col_clues : int list list) (row_clues : int list list) : bool =  
                     (is_rectangular grid) &&
                     (let rec build_row (grid : int list list) : int list list = (match grid with 
                                               | [] -> []
@@ -297,4 +332,5 @@ let verify_solution (grid : int list list) (col_clues : int list list) (row_clue
                       let rec build_col (grid : int list list) (n : int) (idx : int) : int list list = if n = idx then []
                                                                                                        else zero_counter (get_nth_grid grid n) :: (build_col grid (n+1) idx) in 
                             let col_grid = build_col grid 0 num_cols in
-                                equal_grid col_grid col_clues);;
+                                equal_grid col_grid col_clues);; *)
+                                   
