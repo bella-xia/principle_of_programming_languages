@@ -50,16 +50,16 @@ let rec find_recfun (ls : (ident * (ident * expr * expr)) list) (query: ident) :
 
 let rec eval_helper (e : expr) (ls : (ident * (ident * expr * expr)) list) : expr = 
   match e with
-| Var id -> 
+  | Var id -> 
   let if_rec = find_recfun ls id in
     (match if_rec with
       | None -> Var id
       | Some (var, body, expression) -> Function (var, substitution id body (LetRec (id, var, body, expression))))
-| Int int_val -> Int int_val
+  | Int int_val -> Int int_val
 
-| Bool bool_val -> Bool bool_val
+  | Bool bool_val -> Bool bool_val
 
-| Plus (a, b)  -> 
+  | Plus (a, b)  -> 
    let a_eval = eval_helper a ls in 
      let b_eval = eval_helper b ls in
    (
@@ -71,7 +71,7 @@ let rec eval_helper (e : expr) (ls : (ident * (ident * expr * expr)) list) : exp
      | _ -> failwith "invalid integer for Add operation"
    )
 
-| Minus (a, b) -> 
+  | Minus (a, b) -> 
  let a_eval = eval_helper a ls in 
  let b_eval = eval_helper b ls in
 (
@@ -83,7 +83,7 @@ match a_eval with
  | _ -> failwith "invalid integer for Minus operation"
 )
 
-| Equal (a, b) -> 
+  | Equal (a, b) -> 
   let a_eval = eval_helper a ls in 
   let b_eval = eval_helper b ls in
 (
@@ -95,7 +95,7 @@ match a_eval with
  | _ -> failwith "invalid integer for Equal operation"
 )
 
-| And (a, b) -> 
+  | And (a, b) -> 
   let a_eval = eval_helper a ls in 
   let b_eval = eval_helper b ls in
 (
@@ -107,7 +107,7 @@ match a_eval with
  | _ -> failwith "invalid boolean for And operation"
 )
 
-| Or (a, b) -> 
+  | Or (a, b) -> 
   let a_eval = eval_helper a ls in 
   let b_eval = eval_helper b ls in
 (
@@ -119,7 +119,7 @@ match a_eval with
  | _ -> failwith "invalid boolean for Or operation"
 )
 
-| Not a -> 
+  | Not a -> 
   let a_eval = eval_helper a ls in 
  (
    match a_eval with
@@ -127,9 +127,9 @@ match a_eval with
      | _ -> failwith "invalid boolean for Not operation"
    )
                 
-| Function (a, b) -> Function (a, b)
+  | Function (a, b) -> Function (a, b)
 
-| If (a, b, c) -> 
+  | If (a, b, c) -> 
   let a_eval = eval_helper a ls in 
   (
    match a_eval with
@@ -138,7 +138,7 @@ match a_eval with
      | _ -> failwith "invalid boolean for If operation"
   )
 
-| Appl (a, b) -> 
+  | Appl (a, b) -> 
   let b_eval = eval_helper b ls in
    (match a with
      | Var recid -> let result = find_recfun ls recid in
@@ -157,9 +157,9 @@ match a_eval with
      | _ -> failwith "invalid use of application rule"
   )
     ))
-| Let (a, b, c) -> eval_helper (substitution a c (eval_helper b ls)) ls
+  | Let (a, b, c) -> eval_helper (substitution a c (eval_helper b ls)) ls
 
-| LetRec (a, b, c, d) -> let new_ls = (a, (b, c, d)) :: ls in
+  | LetRec (a, b, c, d) -> let new_ls = (a, (b, c, d)) :: ls in
                            eval_helper d new_ls
 
 
