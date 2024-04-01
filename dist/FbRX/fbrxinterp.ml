@@ -53,7 +53,8 @@ let rec substitution (var : ident) (body : expr) (value : expr) : expr =
     | Function (a, b) -> if (a = var) then Function (a, b) else Function (a, (substitution var b value))
     | Appl (a, b) -> Appl ((substitution var a value), (substitution var b value))
     | Let (a, b, c) -> if (a = var) then Let (a, (substitution var b value), c) else Let (a, (substitution var b value), (substitution var c value)) 
-    | LetRec (a, b, c, d) -> if (b = var) then LetRec (a, b, c, (substitution var d value)) else LetRec (a, b, (substitution var c value), (substitution var d value))
+    | LetRec (a, b, c, d) -> if (a = var) then LetRec (a, b, c, d) else 
+      (if (b = var) then LetRec (a, b, c, (substitution var d value)) else LetRec (a, b, (substitution var c value), (substitution var d value)))
     | Record l -> (match l with
                   | [] -> Record []
                   | x :: xs -> let (lab, e) = x in
@@ -65,7 +66,7 @@ let rec substitution (var : ident) (body : expr) (value : expr) : expr =
     | Select (a, b) -> Select (a, substitution var b value)
     | Append (a, b) -> Append(substitution var a value, substitution var b value)
     | Raise (a, b) -> Raise (a, substitution var b value)
-    | Try (a, b, c, d) -> Try (substitution var a value, b, c, substitution var d value)
+    | Try (a, b, c, d) -> if c = var then Try (substitution var a value, b, c, d) else Try (substitution var a value, b, c, substitution var d value)
     | terminal_expr -> terminal_expr
 
 let rec find_recfun (ls : (ident * (ident * expr * expr)) list) (query: ident) : (ident * expr * expr) option = 
@@ -95,8 +96,10 @@ let rec eval_helper (e : expr) (ls : (ident * (ident * expr * expr)) list) : exp
    match a_eval with
      | Int a_val -> (match b_eval with
        | Int b_val -> Int (a_val + b_val)
+       | Raise (b_ex, b_expr) -> b_eval
        | _ -> fbTypeMismatch
      )
+     | Raise (a_ex, a_expr) -> a_eval
      | _ -> fbTypeMismatch
    )
 
@@ -107,8 +110,10 @@ let rec eval_helper (e : expr) (ls : (ident * (ident * expr * expr)) list) : exp
 match a_eval with
  | Int a_val -> (match b_eval with
    | Int b_val -> Int (a_val - b_val)
+   | Raise (b_ex, b_expr) -> b_eval
    | _ -> fbTypeMismatch
  )
+ | Raise (a_ex, a_expr) -> a_eval
  | _ -> fbTypeMismatch
 )
 
@@ -119,11 +124,14 @@ match a_eval with
 match a_eval with
  | Int a_val -> (match b_eval with
    | Int b_val -> Bool (a_val = b_val)
+   | Raise (b_ex, b_expr) -> b_eval
    | _ -> fbTypeMismatch
  )
  | String a_str -> (match b_eval with
     | String b_str -> Bool (a_str = b_str)
+    | Raise (b_ex, b_expr) -> b_eval
     | _ -> fbTypeMismatch)
+ | Raise (a_ex, a_expr) -> a_eval
  | _ -> fbTypeMismatch
 )
 
@@ -134,8 +142,10 @@ match a_eval with
 match a_eval with
  | Bool a_val -> (match b_eval with
    | Bool b_val -> Bool (a_val && b_val)
+   | Raise (b_ex, b_expr) -> b_eval
    | _ -> fbTypeMismatch
  )
+ | Raise (a_ex, a_expr) -> a_eval
  | _ -> fbTypeMismatch
 )
 
@@ -146,8 +156,10 @@ match a_eval with
 match a_eval with
  | Bool a_val -> (match b_eval with
    | Bool b_val -> Bool (a_val || b_val)
+   | Raise (b_ex, b_expr) -> b_eval
    | _ -> fbTypeMismatch
  )
+ | Raise (a_ex, a_expr) -> a_eval
  | _ -> fbTypeMismatch
 )
 
@@ -156,6 +168,7 @@ match a_eval with
  (
    match a_eval with
      | Bool a_val -> Bool (not a_val)
+     | Raise (a_ex, a_expr) -> a_eval
      | _ -> fbTypeMismatch
    )
                 
@@ -167,11 +180,16 @@ match a_eval with
    match a_eval with
      | Bool true -> eval_helper b ls
      | Bool false -> eval_helper c ls
+     | Raise (if_ex, if_expr) -> a_eval
      | _ -> fbTypeMismatch
   )
 
   | Appl (a, b) -> 
   let b_eval = eval_helper b ls in
+  (
+    match b_eval with
+    | Raise (b_exn, b_expr) -> b_eval
+    | _ ->
    (match a with
      | Var recid -> let result = find_recfun ls recid in
      (match result with
@@ -186,10 +204,17 @@ match a_eval with
      | Function (var, body) -> 
        let sub_body = substitution var body b_eval in
          eval_helper sub_body ls
+     | Raise (a_ex, a_expr) -> a_eval
      | _ -> fbTypeMismatch
   )
-    ))
-  | Let (a, b, c) -> eval_helper (substitution a c (eval_helper b ls)) ls
+    )
+    )
+  )
+  | Let (a, b, c) -> let val_eval = eval_helper b ls in
+                      (match val_eval with
+                      | Raise (val_exn, val_expr) -> val_eval
+                      | _ -> eval_helper (substitution a c val_eval) ls
+                      )
 
   | LetRec (a, b, c, d) -> let new_ls = (a, (b, c, d)) :: ls in
                            eval_helper d new_ls
@@ -199,10 +224,15 @@ match a_eval with
       | [] -> Record l
       | x :: xs -> let (lab, e) = x in
         let e_eval = eval_helper e ls in
-          (match (eval_helper (Record xs) ls) with
+         ( match e_eval with
+           | Raise (e_ex, e_expr) -> e_eval
+           | _ -> let xs_eval = eval_helper (Record xs) ls in
+          (match xs_eval with
             | Record xs_eval -> Record ((lab, e_eval) :: xs_eval)
+            | Raise (e_ex, e_expr) -> xs_eval
             | _ -> fbTypeMismatch
           )
+         )
   )
 
   | Select (a, b) -> 
@@ -215,6 +245,7 @@ match a_eval with
                 if (lab = k) then e else (find_lab_helper xs k)
             ) in
           find_lab_helper b_rec a
+        | Raise (b_ex, b_expr) -> b_eval
         | _ -> fbTypeMismatch
       )
   
@@ -234,22 +265,27 @@ match a_eval with
         (match a_eval with
           | String a_str -> (match b_eval with
                                 | String b_str -> String (a_str ^ b_str)
+                                | Raise (b_exn, b_expr) -> b_eval
                                 | _ -> fbTypeMismatch)
           | Record a_rec -> (match b_eval with
                                 | Record b_rec -> Record (record_append_helper a_rec b_rec)
+                                | Raise (b_exn, b_expr) -> b_eval
                                 | _ -> fbTypeMismatch)
+          | Raise (a_ex, a_expr) -> a_eval
           | _ -> fbTypeMismatch)
     
   | Try (a, b, c, d) -> 
     let a_eval = eval_helper a ls in
       (match a_eval with
-        | Raise (a_exn, a_e) -> if (a_exn = b) then substitution c d a_e else Raise (a_exn, a_e)
+        | Raise (a_exn, a_e) -> if (a_exn = b) then eval_helper (substitution c d a_e) ls else Raise (a_exn, a_e)
         | _ -> a_eval
       )                     
   
   | Raise (a, b) -> 
     let b_eval = eval_helper b ls in
-      Raise (a, b_eval)
+      match b_eval with
+      | Raise (b_exn, b_excep) -> b_eval
+      | _ -> Raise (a, b_eval)
 
 let eval e = 
   let close_check = check_closed e [] in 
