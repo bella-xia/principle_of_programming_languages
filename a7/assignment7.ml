@@ -58,7 +58,8 @@ will get an item the first time and the second time will get a wait and will nee
     consumer <- 0
     ";;
 
-    let recur_producer_tester = "
+
+(*    let recur_producer_tester = "
     Let producer_behavior = ("^producer_behavior^") In
     Let producer = Create(producer_behavior, 0) In
     Let recur_consumer_behavior = 
@@ -92,7 +93,7 @@ will get an item the first time and the second time will get a wait and will nee
     Let consumer = Create(recur_consumer_behavior, 3) In
     consumer <- `delivered(00)
     ";;
-(*
+
 This is in fact not a very good test, the producer is both getting its own 
 `produce message as well as the `consume message and since arrival order is 
 nondeterministic by default the test will only work half the time. Our suggestion 
@@ -145,7 +146,19 @@ to the consumer before its `consume message is finally processed. Put some â€œâ€
 in your sequence for the part that could repeat.
 *)
 
-  (* a7c. ... YOUR ANSWER HERE ... *)
+  (* a7c. {[producer <- `consume(consumer)] <consumed>} ->  
+          {[consumer <- `wait(00)] <consumed>, [producer <- `produce(00)]} ->  
+          {[producer <- `consume(consumer)] <consumed>, [producer <- `produce(00)]} -> 
+          {[consumer <- `wait(00)] <consumed>, [producer <- `produce(00)], [producer <- `produce(00)]} ->
+          {[producer <- `consume(consumer)] <consumed> , [producer <- `produce(00)], [producer <- `produce(00)]} ->
+          ... 
+          {[producer <- `produce(00)] * N <consumed> , [producer <- `consume(consumer)] Or [consumer <- `wait(00)]} ->
+          {[producer <- `consume(consumer)] Or [consumer <- `wait(00)], [producer <- `produce(00)] * (N-1)} (either one can get consumed)  -> 
+          ...
+          {[producer <- `consume(consumer)] Or [consumer <- `wait(00)] <consumed> [producer <- `produce(00)] * K} -> 
+          ... 
+          {[producer <- `produce(00)] * K, [producer <- `delivered(00)]} 
+  *)
 
 
 (*
@@ -174,14 +187,15 @@ If not, send me <- `purchase(_), and update the demand.
                 Match msg With
                   | `purchase(_) -> ((Fst(state) <- `consume(me)); (this state))
                   | `wait(_) -> ((Fst(state) <- `consume(me)); (this state))
-                  | `delivered(_) -> If Snd(state) = 0 
+                  | `delivered(_) -> Let curr_state = (Snd(state) - 1) In
+                                     If (curr_state = 0)
                                      Then (
                                             (Print \"Actor\"; (Print me); Print \"all delivered!\n\");
-                                            Fun _ -> Fun _ -> 0
+                                            Fun msg -> (Print \"End!\n\"); 0
                                           )
                                       Else (
-                                              (me <- `purchase(_));
-                                              (this (Fst(state), (Snd(state)-1)))
+                                              (me <- `purchase(00));
+                                              (this (Fst(state), curr_state))
                                             )
           )";;
   
@@ -201,6 +215,8 @@ actor to check for this behavior.
     Let user = Create(consumer_behavior, (producer, 1)) In
     Let user2 = Create(consumer_behavior, (producer, 2)) In
     user <- `purchase(00);
-    user2 <- `purchase(00) 
+    user2 <- `purchase(00)
     ";;
+
+
   
