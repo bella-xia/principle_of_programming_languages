@@ -112,8 +112,7 @@ let rec typecheck_helper (e : expr) (gamma : (ident * fbtype) list) : fbtype =
                              let with_type = typecheck_helper e ((c, d) :: gamma) in
                              if (equal_fbtype try_type with_type || equal_fbtype try_type TBottom) then with_type else raise TypecheckerInvalidType
 
-  | Ref a -> let expr_type = typecheck_helper a gamma in 
-              if (equal_fbtype expr_type TBottom) then TBottom else TRef expr_type
+  | Ref a -> TRef (typecheck_helper a gamma)
   
   | Set (a, b) -> let a_type = typecheck_helper a gamma in
                     let b_type = typecheck_helper b gamma in 

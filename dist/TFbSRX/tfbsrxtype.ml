@@ -64,6 +64,9 @@ let rec typecheck_helper (e : expr) (gamma : (ident * fbtype) list) : fbtype =
   | Appl (a, b) -> let fun_type = typecheck_helper a gamma in
                       let rec substitutable_param (input_type :fbtype) (param_type : fbtype) : bool = (match param_type with
                       | TBottom -> true
+                      | TRef param_deref -> (match input_type with
+                                             | TRef input_deref -> substitutable_param input_deref param_deref
+                                             | _ -> raise TypecheckerInvalidType)
                       | TRec param_list -> let rec find_query (ls : (label * fbtype) list) (query : label) : fbtype = 
                                                (match ls with
                                                 | [] -> raise TypecheckerUnclosedVariable
@@ -106,14 +109,13 @@ let rec typecheck_helper (e : expr) (gamma : (ident * fbtype) list) : fbtype =
                         | _ -> raise TypecheckerInvalidType)
   
   | Raise (a, b, c) -> let raise_type = typecheck_helper c gamma in
-                             if (equal_fbtype b raise_type) then TBottom else raise TypecheckerInvalidType
+                             if (equal_fbtype b raise_type) || (raise_type = TBottom) then TBottom else raise TypecheckerInvalidType
 
   | Try (a, b, c, d, e) -> let try_type = typecheck_helper a gamma in
                              let with_type = typecheck_helper e ((c, d) :: gamma) in
                              if (equal_fbtype try_type with_type || equal_fbtype try_type TBottom) then with_type else raise TypecheckerInvalidType
 
-  | Ref a -> let expr_type = typecheck_helper a gamma in 
-              if (equal_fbtype expr_type TBottom) then TBottom else TRef expr_type
+  | Ref a -> TRef (typecheck_helper a gamma)
   
   | Set (a, b) -> let a_type = typecheck_helper a gamma in
                     let b_type = typecheck_helper b gamma in 
